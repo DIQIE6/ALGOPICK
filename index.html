@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AlgoPick · 算法选择训练器</title>
+<link rel="stylesheet" href="assets/vendor/katex/katex.min.css">
+<link rel="stylesheet" href="assets/app.css">
+</head>
+<body>
+<div class="app">
+
+  <header class="top">
+    <div class="brand">
+      <h1>AlgoPick<span class="dot">.</span></h1>
+      <span class="sub">看题 → 选数据结构 / 算法 → 立刻知道对不对</span>
+    </div>
+    <nav class="tabs">
+      <button class="tab on" id="tabPractice">✏️ 练习</button>
+      <button class="tab" id="tabLearn">📖 讲解<span class="tab-badge" id="learnBadge"></span></button>
+    </nav>
+    <span class="tag" id="poolInfo">题库加载中…</span>
+    <span id="practiceTools" style="display:contents">
+      <button class="btn sm" id="btnFilter">筛选</button>
+      <button class="btn sm ai" id="btnGen" title="让 AI 现场出题">AI 出题</button>
+    </span>
+    <button class="btn sm" id="btnImport">导入题库</button>
+    <button class="btn sm" id="btnStats">统计</button>
+    <button class="btn sm ai" id="btnAI">AI 设置</button>
+    <button class="btn sm ghost" id="btnTheme" title="切换主题">◐</button>
+  </header>
+
+<div id="viewPractice">
+  <div class="banner" id="banner" style="display:none"></div>
+
+  <section class="filters" id="filters">
+    <div class="frow"><label>来源</label><div class="chips" id="fSource"></div></div>
+    <div class="frow"><label>难度</label><div class="chips" id="fDiff"></div></div>
+    <div class="frow"><label>知识点</label><div class="chips" id="fTag"></div></div>
+    <div class="frow"><label>状态</label><div class="chips" id="fState"></div></div>
+    <div class="frow"><label>搜索</label>
+      <input class="btn grow" id="fSearch" placeholder="在题号 / 题名 / 题干里搜索…" style="flex:1">
+      <button class="btn sm" id="btnResetFilter">重置</button>
+    </div>
+  </section>
+
+  <div class="layout">
+    <main id="main"></main>
+
+    <aside class="side">
+      <div class="panel">
+        <h3>本次练习</h3>
+        <div class="kpis">
+          <div class="kpi"><b id="kSeen">0</b><span>已练题数</span></div>
+          <div class="kpi"><b id="kAcc">–</b><span>正确率</span></div>
+          <div class="kpi"><b id="kStreak">0</b><span>连续答对</span></div>
+          <div class="kpi"><b id="kPool">0</b><span>可选题目</span></div>
+        </div>
+      </div>
+      <div class="panel">
+        <h3>知识点掌握度</h3>
+        <div class="bars" id="barsAll"><div class="empty">还没有作答记录。</div></div>
+      </div>
+      <div class="panel">
+        <h3>快捷键</h3>
+        <div class="note">
+          <kbd>1</kbd>–<kbd>9</kbd> 选择选项 · <kbd>Enter</kbd> 提交 / 下一题<br>
+          <kbd>H</kbd> 提示 · <kbd>Space</kbd> 跳过 · <kbd>R</kbd> 打开原题<br>
+          <kbd>F</kbd> 筛选 · <kbd>Esc</kbd> 关闭弹窗
+        </div>
+      </div>
+    </aside>
+  </div>
+</div><!-- /viewPractice -->
+
+<!-- ============ 讲解版块（网页内的独立部分） ============ -->
+<section id="viewLearn" style="display:none">
+  <div class="learn-wrap">
+    <aside class="learn-side">
+      <div class="learn-side-head">
+        <input class="input" id="learnSearch" placeholder="搜索知识点 / 英文名…">
+        <div class="learn-count" id="learnCount"></div>
+      </div>
+      <div class="learn-list" id="learnList"></div>
+    </aside>
+    <section class="learn-main" id="learnMain"></section>
+  </div>
+</section>
+
+</div><!-- /app -->
+
+<!-- ============ 题库导入 ============ -->
+<div class="modal" id="mImport">
+  <div class="box">
+    <h2>导入题库</h2>
+    <div class="muted">支持本工具 JSON 格式，以及 Codeforces / LeetCode 导出的通用 JSON、CSV。</div>
+    <div class="field">
+      <label>方式一：选择 JSON / CSV 文件</label>
+      <input type="file" id="fileImport" class="input" accept=".json,.js,.csv,.txt">
+    </div>
+    <div class="field">
+      <label>方式二：直接粘贴 JSON（数组或 {"questions": [...]}）</label>
+      <textarea class="textarea" id="pasteImport" placeholder='[{"title":"…","statement":"…","answer":["hash"],"url":"…"}]'></textarea>
+    </div>
+    <div class="actions">
+      <button class="btn primary" id="doImport">导入</button>
+      <button class="btn ghost" id="doExport">导出我的题库(JSON)</button>
+      <button class="btn ghost" id="doExportProgress">导出进度</button>
+      <div class="spacer"></div>
+      <button class="btn ghost" data-close>关闭</button>
+    </div>
+    <hr class="sep">
+    <div class="note">
+      <b>想要几万道题的题库？</b> 在项目目录运行 <code>node tools/build-banks.mjs</code>，
+      脚本会从 Codeforces 官方 API 和 LeetCode 公开题库拉取题目标签，生成
+      <code>data/bank-cf.js</code> 与 <code>data/bank-lc.js</code>，刷新本页即可自动加载。<br>
+      字段说明：<code>answer</code> 只能填知识点 id，完整 id 见 <a href="assets/patterns.js" target="_blank">assets/patterns.js</a>；
+      也支持直接写中文名（如 <code>"哈希表"</code>），导入时会自动映射。
+    </div>
+  </div>
+</div>
+
+<!-- ============ AI 设置 ============ -->
+<div class="modal" id="mAI">
+  <div class="box">
+    <h2>AI 接入（可选）</h2>
+    <div class="muted">
+      接入任意 OpenAI 兼容接口后，可让 AI 出题、分级提示、点评你的解题思路。不填也能正常刷题。
+    </div>
+
+    <div class="field">
+      <label>连接方式</label>
+      <select class="input" id="aiMode">
+        <option value="proxy">本地代理（推荐，无跨域问题）</option>
+        <option value="direct">浏览器直连（部分服务商不允许跨域）</option>
+        <option value="off">关闭 AI 功能</option>
+      </select>
+    </div>
+    <div class="field">
+      <label>服务商预设</label>
+      <select class="input" id="aiPreset">
+        <option value="">— 选择后自动填入下面三项 —</option>
+        <option value="deepseek">DeepSeek（便宜、中文好）</option>
+        <option value="openai">OpenAI</option>
+        <option value="zhipu">智谱 GLM（有免费额度）</option>
+        <option value="moonshot">月之暗面 Kimi</option>
+        <option value="ollama">本机 Ollama（完全离线免费）</option>
+      </select>
+    </div>
+    <div class="field"><label>API Base URL</label><input class="input" id="aiBase" placeholder="https://api.deepseek.com/v1"></div>
+    <div class="row2">
+      <div class="field"><label>API Key</label><input class="input" id="aiKey" type="password" placeholder="sk-…"></div>
+      <div class="field"><label>模型名</label><input class="input" id="aiModel" placeholder="deepseek-chat"></div>
+    </div>
+    <div class="note" id="aiProxyNote" style="display:none">
+      本地代理模式下，请先用 <code>node tools/serve.mjs</code> 启动本地服务，并通过
+      <code>http://127.0.0.1:8787</code> 打开本页面。API Key 直接填在这里即可，只会发给你自己的电脑。
+    </div>
+    <div class="field" style="margin-top:12px">
+      <label style="display:flex;align-items:center;gap:8px;cursor:pointer">
+        <input type="checkbox" id="aiAutoStmt" style="width:auto">
+        <span>自动抓取并翻译英文题干 —— 原站自带中文的直接拉中文（不翻译），只有英文才翻译</span>
+      </label>
+    </div>
+    <div class="note" id="stmtPrefetchNote" style="margin-top:4px"></div>
+    <hr class="sep">
+    <div class="field">
+      <label>公式渲染方式（LaTeX）</label>
+      <select class="input" id="mathMode">
+        <option value="katex">KaTeX —— 本地内置，秒开，离线可用（推荐）</option>
+        <option value="latex">本机 LaTeX —— 最保真，支持完整 amsmath，需要本地服务</option>
+        <option value="off">不渲染，原样显示 $...$ 代码</option>
+      </select>
+      <div class="note" id="mathNote"></div>
+    </div>
+    <div class="actions">
+      <button class="btn primary" id="aiSave">保存</button>
+      <button class="btn" id="aiTest">测试连接</button>
+      <div class="spacer"></div>
+      <button class="btn ghost" data-close>关闭</button>
+    </div>
+    <div class="ai-out" id="aiTestOut"></div>
+  </div>
+</div>
+
+<!-- ============ 统计 ============ -->
+<div class="modal" id="mStats">
+  <div class="box">
+    <h2>学习统计</h2>
+    <div class="muted" id="statsSummary"></div>
+    <div class="bars" id="statsBars"></div>
+    <hr class="sep">
+    <h3 style="font-size:13px;color:var(--text-dim);margin:0 0 8px">最近答错的题</h3>
+    <div id="wrongList" class="note"></div>
+    <div class="actions">
+      <button class="btn ghost" id="doReset">清空全部进度</button>
+      <div class="spacer"></div>
+      <button class="btn ghost" data-close>关闭</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script src="assets/patterns.js"></script>
+<!-- KaTeX：本地内置，离线渲染公式（assets/vendor/katex/） -->
+<script src="assets/vendor/katex/katex.min.js"></script>
+<!-- 本地精选题库（自包含题干，离线可玩） -->
+<script src="data/bank-a1.js"></script>
+<script src="data/bank-a2.js"></script>
+<script src="data/bank-a3.js"></script>
+<script src="data/bank-b.js"></script>
+<!-- 自动生成的大题库（运行 node tools/build-banks.mjs 后才有） -->
+<script src="data/bank-cf.js" onerror="console.info('未生成 Codeforces 大题库（可选）')"></script>
+<script src="data/bank-lc.js" onerror="console.info('未生成 LeetCode 大题库（可选）')"></script>
+<!-- 中文题干：node tools/fetch-statements.mjs --lc / --cf 生成 -->
+<script src="data/stmt-lc.js" onerror="console.info('未预取 LeetCode 中文题干（可选）')"></script>
+<script src="data/stmt-cf.js" onerror="console.info('未预取 Codeforces 题干（可选）')"></script>
+<script src="data/stmt-cache.js" onerror="console.info('还没有抓取缓存（可选）')"></script>
+<!-- 知识点讲解：基本操作 / Python 实现 / 应用 / 如何识别 / 学习链接 -->
+<script src="data/learn-1.js" onerror="console.info('learn-1.js 未找到')"></script>
+<script src="data/learn-2.js" onerror="console.info('learn-2.js 未找到')"></script>
+<script src="data/learn-3.js" onerror="console.info('learn-3.js 未找到')"></script>
+<script src="data/learn-4.js" onerror="console.info('learn-4.js 未找到')"></script>
+<script src="data/learn-5.js" onerror="console.info('learn-5.js 未找到')"></script>
+<script src="data/learn-6.js" onerror="console.info('learn-6.js 未找到')"></script>
+<script src="assets/ai.js"></script>
+<script src="assets/app.js"></script>
+</body>
+</html>
